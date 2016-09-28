@@ -7,14 +7,13 @@ Gem::Specification.new do |s|
   s.author      = 'Mike Schwankl'
   s.email       = 'schwankl@gmail.com'
   s.homepage    = 'https://github.com/schwankl'
-  s.description = 'Haproxy API using sinatra and haproxy-tools'
+  s.description = 'Haproxy API using sinatra'
   s.summary     = 'rest API using to haproxy'
   s.executables = %(hapi)
 
   s.platform         = Gem::Platform::RUBY
   s.extra_rdoc_files = %w()
   s.add_dependency('sinatra', '1.4.7')
-  s.add_dependency('haproxy-tools', '0.4.2')
   s.add_dependency('webrick', '1.3.1')
 
   s.bindir       = 'bin'

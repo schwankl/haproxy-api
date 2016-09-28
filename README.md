@@ -1,5 +1,5 @@
 # haproxy-api
-sinatra haproxy-tools https rest service
+sinatra https rest service for haproxy
 
 example for crt and key gen: 
 ```

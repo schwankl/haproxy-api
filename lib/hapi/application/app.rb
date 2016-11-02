@@ -31,13 +31,6 @@ class HaproxyApi < Sinatra::Base
     $haproxy_config = ENV['HAPROXY_CONFIG']
   end
   $mutable_haproxy_config = $haproxy_config + '.haproxy-api.json'
-  
-  #before do
-  #  request.body.rewind
-  #  if request.body.size > 0
-  #    @request_payload = JSON.parse request.body.read
-  #  end
-  #end  
 
 
   def get_config
@@ -70,7 +63,18 @@ class HaproxyApi < Sinatra::Base
     config['frontend'].each_pair do |name, frontend|
       content += "frontend #{name}\n"
       content += "  bind 0.0.0.0:#{frontend['port']}\n"
-      content += "  default_backend #{name}-backend\n"
+      if frontend.has_key? 'acls'
+        port = ''
+        frontend['acls'].each_pair do |acl,backend_port|        
+          clean_name = acl.gsub('/','_')
+          content += "  acl url_#{clean_name} path_beg #{acl}\n"
+          content += "  use_backend #{name}-#{backend_port}-backend if url_#{clean_name}\n"
+          port = backend_port
+        end
+        content += "  default_backend #{name}-#{port}-backend\n"
+      else
+        content += "  default_backend #{name}-backend\n"
+      end            
       content += "\n"
     end
 
@@ -93,7 +97,7 @@ class HaproxyApi < Sinatra::Base
       end
 
       backend['servers'].each do |server|
-        content += "  server #{server}:#{port} #{server}:#{port} #{server_options} \n"      
+        content += "  server #{server}:#{port} #{server}:#{port} #{server_options} \n"
       end
       content += "\n"        
     end
@@ -121,23 +125,40 @@ class HaproxyApi < Sinatra::Base
       return status(500)
     end
   end
+  
+  
+  def add_acl ( frontend, id, config )
+    acl = frontend['acl']        
+    backend_port = frontend['backend_port']
+    if config.has_key?('frontend') && config['frontend'].has_key?(id)
+      frontend = config['frontend'][id]
+    end
+    if !frontend.has_key?('acls')
+      frontend['acls'] = {}
+    end
+    frontend['acls'][acl] = backend_port
+  end
 
+  
   get '/render' do
     config = get_config
     render config
   end  
-      
+
+
   get '/frontends' do
     config = get_config
     JSON.dump(config['frontend'])
   end
-  
+
+
   get '/frontend/:id' do
     config = get_config
     id = params[:id]
     return status(404) if !config['frontend'].has_key?(id)
     JSON.dump(config['frontend'][id])
   end
+
 
   post '/frontend/:id' do
     config = get_config
@@ -149,11 +170,30 @@ class HaproxyApi < Sinatra::Base
     end
 
     frontend = JSON.parse request.body.read
+    if frontend.has_key? 'acl'
+      add_acl frontend, id, config
+    end
+    
     config['frontend'][id] = frontend
     set_config config
     JSON.dump(frontend)
   end 
 
+
+  put '/frontend/:id' do
+    config = get_config    
+    id = params[:id]
+    frontend = JSON.parse request.body.read
+    if frontend.has_key? 'acl'
+      add_acl frontend, id, config
+    else
+     config['frontend'][id] = frontend                
+    end
+    set_config config
+    JSON.dump(frontend)
+  end
+
+  
   delete '/frontend/:id' do
     config = get_config
     config['frontend'].delete params[:id]
@@ -177,17 +217,31 @@ class HaproxyApi < Sinatra::Base
 
   post '/backend/:id' do
     config = get_config
-    id = params[:id] + "-backend"
+    backend = JSON.parse request.body.read        
+    if backend.has_key?('acl')
+      id = params[:id] + '-' + backend['port'] + "-backend"
+    else
+      id = params[:id] + "-backend"
+    end
     if config['backend'].has_key?(id)
       puts "#{id} already exists - use put"
       return status(500)
     end
-    backend = JSON.parse request.body.read
     config['backend'][id] = backend
     set_config config
     JSON.dump(backend)
   end
-   
+
+
+  put '/backend/:id' do
+    config = get_config
+    id = params[:id] + "-backend"
+    backend = JSON.parse request.body.read
+    config['backend'][id] = backend
+    set_config config
+    JSON.dump(backend)
+  end  
+     
   
   delete '/backend/:id' do
     config = get_config
@@ -198,4 +252,3 @@ class HaproxyApi < Sinatra::Base
 end
 
 Rack::Handler::WEBrick.run HaproxyApi, webrick_options
-

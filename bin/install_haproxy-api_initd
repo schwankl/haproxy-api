@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-if !File.exists('/etc/haproxy/hapi.crt')
+if !File.exists?('/etc/haproxy/hapi.crt')
   puts "generating hapi.crt and hapi.key in /etc/haproxy"
   Dir.chdir '/etc/haproxy'
   system("openssl req -x509 -newkey rsa:4096 -keyout hapi.key -out hapi.crt -days 365 -nodes -subj \"/C=UT/ST=Sandy /L=Sandy/O=Global Security/OU=IT Department/CN=tooese.com\"")
